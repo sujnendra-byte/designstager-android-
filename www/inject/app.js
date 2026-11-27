@@ -182,6 +182,120 @@
     doc.classList.toggle('ds-overlay', on);
   }
 
+
+  /* ---------- presentation editor: simple "view" screen first, full editor on demand ---------- */
+  var edCss = '' +
+    /* view mode: only the slides + app action bar */
+    'html.ds-ed-view #dsp-ppt-toolbar, html.ds-ed-view #dsel-bar, html.ds-ed-view #dsel-dock, html.ds-ed-view #dsel-keys,' +
+    'html.ds-ed-view #dsel-panel, html.ds-ed-view #dsp-ppt-panel-right, html.ds-ed-view #dsp-vp-panel,' +
+    'html.ds-ed-view #dsp-ppt-panel-left > *:not(#dsp-ppt-thumbs):not(#ds-ed-hint), html.ds-ed-view .vp-thumb-del, html.ds-ed-view .dsx-tact,' +
+    'html.ds-ed-view #ds-suji-btn{display:none !important}' +
+    'html.ds-ed-view #dsp-editor-fullscreen{background:#f4f5f9 !important;left:0 !important;right:0 !important;width:100vw !important}' +
+    'html.ds-ed-view #dsp-ppt-workspace{display:block !important;height:100vh !important;padding:0 !important}' +
+    'html.ds-ed-view #dsp-ppt-panel-left{width:100vw !important;display:block !important;max-width:none !important;min-width:0 !important;height:100vh !important;' +
+    'overflow-y:auto !important;overflow-x:hidden !important;border:0 !important;background:#f4f5f9 !important;' +
+    'padding:68px 0 104px !important;box-sizing:border-box !important;position:relative !important}' +
+    'html.ds-ed-view #dsp-ppt-thumbs{display:flex !important;flex-direction:column !important;flex-wrap:nowrap !important;' +
+    'gap:16px !important;padding:4px 14px !important;overflow:visible !important;height:auto !important;max-height:none !important;width:auto !important}' +
+    'html.ds-ed-view .dsp-thumb-item{width:auto !important;height:auto !important;margin:0 !important;padding:0 !important;' +
+    'background:none !important;border:0 !important;box-shadow:none !important;flex:none !important}' +
+    'html.ds-ed-view .dsp-thumb-num{display:block !important;position:static !important;font:600 12px Poppins,system-ui,sans-serif !important;' +
+    'color:#6b7190 !important;margin:0 0 6px 2px !important;background:none !important}' +
+    'html.ds-ed-view .dsp-thumb-box{width:100% !important;border-radius:6px !important;overflow:hidden !important;' +
+    'box-shadow:0 4px 16px rgba(20,26,48,.16) !important;outline:0 !important}' +
+    /* view mode bars */
+    '#ds-ed-top,#ds-ed-act,#ds-ed-done{font-family:Poppins,system-ui,sans-serif;box-sizing:border-box}' +
+    '#ds-ed-top{position:fixed;left:0;right:0;top:0;height:56px;z-index:100002;display:none;align-items:center;gap:6px;' +
+    'background:#141a30 !important;padding:0 10px 0 6px}' +
+    '#ds-ed-top *{color:#fff !important}' +
+    '#ds-ed-top .b{width:40px;height:40px;display:grid;place-items:center;border:0;background:none !important;padding:0}' +
+    '#ds-ed-top .t{flex:1;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '#ds-ed-top .s{border:1px solid rgba(255,255,255,.35) !important;background:none !important;border-radius:999px;padding:6px 14px;font:500 13px Poppins,sans-serif}' +
+    '#ds-ed-act{position:fixed;left:0;right:0;bottom:0;z-index:100002;display:none;gap:8px;background:#fff !important;' +
+    'border-top:1px solid #e4e6ef;padding:10px 12px calc(env(safe-area-inset-bottom,0px) + 10px);box-shadow:0 -4px 16px rgba(20,26,48,.08)}' +
+    '#ds-ed-act button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;border:0;border-radius:12px;padding:8px 2px;' +
+    'background:#f1f2f7 !important;color:#141a30 !important;font:600 11.5px Poppins,system-ui,sans-serif}' +
+    '#ds-ed-act button.p{background:#e7552f !important;color:#fff !important}' +
+    '#ds-ed-act svg,#ds-ed-top svg,#ds-ed-done svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}' +
+    'html.ds-ed-view #ds-ed-top, html.ds-ed-view #ds-ed-act{display:flex}' +
+    '#ds-ed-hint{text-align:center;color:#6b7190;font:500 12px Poppins,sans-serif;margin:2px 0 10px}' +
+    /* download menu as a bottom sheet in view mode */
+    'html.ds-ed-view #dsx-menu{position:fixed !important;left:12px !important;right:12px !important;top:auto !important;' +
+    'bottom:calc(env(safe-area-inset-bottom,0px) + 92px) !important;width:auto !important;max-width:none !important;z-index:100003 !important}' +
+    /* full editor: scrollable toolbars + Done button */
+    'html.ds-ed-full #dsp-ppt-toolbar, html.ds-ed-full #dsel-dock .dsel-right{overflow-x:auto !important;flex-wrap:nowrap !important;scrollbar-width:none}' +
+    'html.ds-ed-full #dsp-ppt-toolbar > *, html.ds-ed-full #dsel-dock .dsel-right > *{flex:0 0 auto !important}' +
+    '#ds-ed-done{position:fixed;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 64px);z-index:100002;display:none;align-items:center;gap:6px;' +
+    'border:0;border-radius:999px;padding:10px 16px;background:#141a30 !important;color:#fff !important;font:600 13px Poppins,sans-serif;' +
+    'box-shadow:0 6px 18px rgba(0,0,0,.3)}' +
+    'html.ds-ed-full #ds-ed-done{display:flex}';
+  var edSt = document.createElement('style'); edSt.textContent = edCss; (document.head || doc).appendChild(edSt);
+
+  var IC = {
+    back: '<path d="M15 5l-7 7 7 7"/>',
+    dl: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+    anim: '<path d="M5 4l14 8-14 8z"/><path d="M2 8v8" opacity=".5"/>',
+    prev: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M10 9l5 2-5 2zM8 21h8"/>',
+    edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
+    done: '<path d="M5 12l5 5 9-10"/>'
+  };
+  var fullEdit = false, edOn = false;
+  function siteClick(sel) { var b = document.querySelector(sel); if (b) b.click(); return !!b; }
+  function setOrient(o) { try { if (window.DSNative && DSNative.setOrientation) DSNative.setOrientation(o); } catch (e) { } }
+  function buildEdBars() {
+    if (document.getElementById('ds-ed-top')) return;
+    var top = document.createElement('div'); top.id = 'ds-ed-top';
+    top.innerHTML = '<button class="b" aria-label="Back"><svg viewBox="0 0 24 24">' + IC.back + '</svg></button><div class="t"></div><button class="s">Save</button>';
+    top.querySelector('.b').onclick = function () { siteClick('.dsp-tb-back'); };
+    top.querySelector('.s').onclick = function () { siteClick('#dsp-savebtn'); toast('Saved'); };
+    var act = document.createElement('div'); act.id = 'ds-ed-act';
+    act.innerHTML =
+      '<button data-a="dl"><svg viewBox="0 0 24 24">' + IC.dl + '</svg>Download</button>' +
+      '<button data-a="anim"><svg viewBox="0 0 24 24">' + IC.anim + '</svg>Animate</button>' +
+      '<button data-a="prev"><svg viewBox="0 0 24 24">' + IC.prev + '</svg>Preview</button>' +
+      '<button data-a="edit" class="p"><svg viewBox="0 0 24 24">' + IC.edit + '</svg>Edit design</button>';
+    act.onclick = function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      var a = b.getAttribute('data-a');
+      if (a === 'dl') siteClick('#dsp-buildbtn');
+      else if (a === 'anim') siteClick('#dsan-tb');
+      else if (a === 'prev') siteClick('#dssp-tb');
+      else if (a === 'edit') enterFull();
+    };
+    var done = document.createElement('button'); done.id = 'ds-ed-done';
+    done.innerHTML = '<svg viewBox="0 0 24 24">' + IC.done + '</svg>Done';
+    done.onclick = function () { siteClick('#dsp-savebtn'); exitFull(); };
+    document.body.appendChild(top); document.body.appendChild(act); document.body.appendChild(done);
+  }
+  function fitThumbs() {
+    var list = document.getElementById('dsp-ppt-thumbs');
+    if (!list || document.getElementById('ds-ed-hint')) return;
+    var hint = document.createElement('div'); hint.id = 'ds-ed-hint'; hint.textContent = 'Tap a slide to edit it';
+    list.parentNode.insertBefore(hint, list);
+  }
+  function enterFull() { fullEdit = true; doc.classList.remove('ds-ed-view'); doc.classList.add('ds-ed-full'); setOrient('landscape'); }
+  function exitFull() { fullEdit = false; doc.classList.remove('ds-ed-full'); doc.classList.add('ds-ed-view'); setOrient('auto'); setTimeout(fitThumbs, 400); }
+  document.addEventListener('click', function (e) {
+    if (!doc.classList.contains('ds-ed-view')) return;
+    var it = e.target.closest && e.target.closest('.dsp-thumb-item');
+    if (it) setTimeout(enterFull, 60);   // site selects the slide, then open the full editor on it
+  }, true);
+  function editorCheck() {
+    var ed = document.querySelector('#dsp-editor-fullscreen.dsp-open');
+    if (ed && !edOn) {
+      edOn = true; buildEdBars();
+      var t = document.getElementById('dsp-etitle');
+      document.querySelector('#ds-ed-top .t').textContent = t ? t.textContent.trim() : 'Presentation';
+      if (!fullEdit) { doc.classList.add('ds-ed-view'); setTimeout(fitThumbs, 300); }
+    } else if (!ed && edOn) {
+      edOn = false; fullEdit = false; doc.classList.remove('ds-ed-view', 'ds-ed-full'); setOrient('auto');
+    } else if (ed && !fullEdit) {
+      var t2 = document.getElementById('dsp-etitle');
+      if (t2) document.querySelector('#ds-ed-top .t').textContent = t2.textContent.trim();
+    }
+  }
+  setInterval(editorCheck, 700);
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addUI); else addUI();
 
   /* ---------- marketplace: hide the category panel when scrolling down, show it when scrolling up ---------- */

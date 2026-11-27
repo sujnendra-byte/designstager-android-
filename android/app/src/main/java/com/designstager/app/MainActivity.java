@@ -167,6 +167,14 @@ public class MainActivity extends BridgeActivity {
             return "{\"loggedIn\":\"" + p.getString("loggedIn", "") + "\",\"credits\":\"" + p.getString("credits", "").replaceAll("[^0-9,]", "") + "\"}";
         }
 
+        /** "landscape" while the full slide editor is open, "auto" otherwise. */
+        @JavascriptInterface
+        public void setOrientation(String o) {
+            runOnUiThread(() -> setRequestedOrientation("landscape".equals(o)
+                    ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED));
+        }
+
         @JavascriptInterface
         public void downloadUrl(String url, String name, String userAgent) {
             runOnUiThread(() -> enqueueDownload(url, name, null, userAgent));
