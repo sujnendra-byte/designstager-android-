@@ -229,6 +229,39 @@
     'border:0;border-radius:999px;padding:10px 16px;background:#141a30 !important;color:#fff !important;font:600 13px Poppins,sans-serif;' +
     'box-shadow:0 6px 18px rgba(0,0,0,.3)}' +
     'html.ds-ed-full #ds-ed-done{display:flex}';
+  /* ---------- Slide Animation: keep the preview on screen while choosing styles ---------- */
+  edCss += '' +
+    '@media (max-width:1100px){' +
+    'html.ds-app #dsan-app .dsan-center{display:contents !important}' +
+    'html.ds-app #dsan-app .dsan-pin{position:sticky !important;top:56px !important;z-index:20 !important;background:#fff !important;' +
+    'margin:0 -12px !important;padding:8px 12px 10px !important;box-shadow:0 8px 16px -10px rgba(20,26,48,.35) !important}' +
+    'html.ds-overlay #dsan-app .dsan-pin, .dsan-ov #dsan-app .dsan-pin{top:0 !important}' +
+    'html.ds-app #dsan-app .dsan-pin .dsan-ctl{display:flex !important;flex-wrap:wrap !important;gap:8px !important;margin-top:8px !important}' +
+    'html.ds-app #dsan-app .dsan-pin button{padding:8px 14px !important;font-size:13px !important;min-height:0 !important}' +
+    '}' +
+    '@media (max-width:860px){' +
+    'html.ds-app .dsan-ov .dsan-body > .dsan-main{position:sticky !important;top:0 !important;z-index:20 !important;' +
+    'background:#fff !important;box-shadow:0 8px 16px -10px rgba(20,26,48,.35) !important}' +
+    'html.ds-app .dsan-ov .dsan-ctl{flex-wrap:wrap !important;gap:8px !important}' +
+    'html.ds-app .dsan-ov .dsan-ctl button{padding:7px 12px !important;font-size:12.5px !important}' +
+    '}';
+  // choosing a style plays it straight away in the preview
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var area = t.closest('.dsan-grid, #dsan-side, .dsan-side');
+    if (!area || t.closest('.dsan-filt, .dsan-pin, .dsan-ctl')) return;
+    var chip = t.closest('button');
+    if (chip && /^(all|best fit|fade|rise|slide in|wipe|reveal|zoom|simple|subtle|moderate|bold|all 50)$/i.test(chip.textContent.trim())) return;
+    setTimeout(function () {
+      var btns = document.querySelectorAll('button');
+      for (var i = 0; i < btns.length; i++) {
+        var b = btns[i];
+        if (b.offsetParent && /^\W*play (animation|slide)\b/i.test(b.textContent.trim())) { b.click(); break; }
+      }
+    }, 250);
+  }, true);
+
   var edSt = document.createElement('style'); edSt.textContent = edCss; (document.head || doc).appendChild(edSt);
 
   var IC = {
