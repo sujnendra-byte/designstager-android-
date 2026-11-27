@@ -38,6 +38,9 @@
     'html.ds-app #masthead, html.ds-app .site-header, html.ds-app .elementor-location-header,' +
     'html.ds-app .elementor-location-footer, html.ds-app footer.site-footer, html.ds-app #colophon,' +
     'html.ds-app .dst-bar, html.ds-app .dst-bar + div {display:none !important}' +
+    /* Hostinger "Agent" (site-owner AI assistant) is not for app users */
+    'html.ds-app [class*="kodee"], html.ds-app [id*="kodee"], html.ds-app [id*="hostinger-chatbot"],' +
+    'html.ds-app [class*="hostinger-chatbot"], html.ds-app [class*="hts-chatbot"] {display:none !important}' +
     'html.ds-app body{padding-top:56px !important;padding-bottom:calc(68px + env(safe-area-inset-bottom,0px)) !important;background:#f4f5f9 !important}' +
     /* app header */
     '#ds-head{position:fixed;left:0;right:0;top:0;height:56px;z-index:99990;display:flex;align-items:center;gap:6px;' +
