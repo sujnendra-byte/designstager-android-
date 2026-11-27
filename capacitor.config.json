@@ -1,0 +1,28 @@
+{
+  "appId": "com.designstager.app",
+  "appName": "DesignStager",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["designstager.com", "*.designstager.com", "*.razorpay.com"],
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "appendUserAgent": "DesignStagerApp/1.0 (Android)",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": true,
+      "backgroundColor": "#141a30",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DARK"
+    }
+  }
+}

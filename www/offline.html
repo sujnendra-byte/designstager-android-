@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Offline</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  body { display: grid; place-items: center; min-height: 100vh; text-align: center; padding: 24px; }
+  .box { max-width: 320px; }
+  .ic { margin: 0 auto 14px; width: 64px; height: 64px; border-radius: 20px; }
+  .ic svg { width: 32px; height: 32px; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p { color: var(--muted); font-size: 14px; margin: 0 0 22px; }
+  button, a.btn { display: block; width: 100%; border: 0; border-radius: 14px; padding: 14px; font: 600 15px Poppins, sans-serif; margin-top: 10px; }
+  button { background: var(--orange); color: #fff; }
+  a.btn { background: #fff; color: var(--text); border: 1px solid var(--line); }
+</style>
+</head>
+<body>
+  <div class="box">
+    <i class="ic c1"><svg viewBox="0 0 24 24"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0M12 19h.01M3 3l18 18"/></svg></i>
+    <h1>You're offline</h1>
+    <p>DesignStager needs an internet connection. Check your Wi-Fi or mobile data and try again.</p>
+    <button onclick="history.back()">Try again</button>
+    <a class="btn" href="index.html">Go to Home</a>
+  </div>
+</body>
+</html>

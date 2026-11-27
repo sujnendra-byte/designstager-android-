@@ -1,0 +1,229 @@
+package com.designstager.app;
+
+import android.app.AlertDialog;
+import android.app.DownloadManager;
+import android.content.ActivityNotFoundException;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Color;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.util.Base64;
+import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
+import android.webkit.MimeTypeMap;
+import android.webkit.URLUtil;
+import android.webkit.WebView;
+import android.widget.Toast;
+
+import androidx.core.content.FileProvider;
+
+import com.getcapacitor.Bridge;
+import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+
+public class MainActivity extends BridgeActivity {
+
+    private static final String SITE_HOST = "designstager.com";
+    private String injectJs = "";
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        getWindow().getDecorView().setBackgroundColor(Color.parseColor("#141a30"));
+        injectJs = readAsset("public/inject/app.js");
+
+        WebView wv = getBridge().getWebView();
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true);
+        wv.getSettings().setSupportMultipleWindows(false);
+
+        // Native helpers for the injected script
+        wv.addJavascriptInterface(new DSNative(this), "DSNative");
+
+        // Inject the app UI + download hooks into designstager.com pages
+        getBridge().setWebViewClient(new DSWebViewClient(getBridge()));
+
+        // Regular file downloads (links that return a file)
+        wv.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
+            if (url.startsWith("blob:") || url.startsWith("data:")) {
+                String js = "(function(){var a=document.createElement('a');a.href=" + jsString(url)
+                        + ";a.download=" + jsString(URLUtil.guessFileName(url, contentDisposition, mimeType)) + ";a.click();})()";
+                wv.evaluateJavascript(js, null);
+                return;
+            }
+            enqueueDownload(url, URLUtil.guessFileName(url, contentDisposition, mimeType), mimeType, userAgent);
+        });
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        CookieManager.getInstance().flush(); // keep the user logged in
+    }
+
+    private class DSWebViewClient extends BridgeWebViewClient {
+        DSWebViewClient(Bridge bridge) { super(bridge); }
+
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
+            String u = request.getUrl().toString();
+            if (u.startsWith("intent:")) {               // UPI / payment apps (Razorpay etc.)
+                try {
+                    Intent i = Intent.parseUri(u, Intent.URI_INTENT_SCHEME);
+                    i.addCategory(Intent.CATEGORY_BROWSABLE);
+                    i.setComponent(null);
+                    try { startActivity(i); }
+                    catch (ActivityNotFoundException e) {
+                        String fb = i.getStringExtra("browser_fallback_url");
+                        if (fb != null) view.loadUrl(fb);
+                    }
+                } catch (Exception ignored) { }
+                return true;
+            }
+            return super.shouldOverrideUrlLoading(view, request);
+        }
+
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            super.onPageFinished(view, url);
+            if (isSite(url) && !injectJs.isEmpty()) view.evaluateJavascript(injectJs, null);
+        }
+
+        @Override
+        public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+            super.doUpdateVisitedHistory(view, url, isReload);
+            if (isSite(url) && !injectJs.isEmpty()) view.evaluateJavascript(injectJs, null);
+        }
+    }
+
+    private static boolean isSite(String url) {
+        try {
+            String h = Uri.parse(url).getHost();
+            return h != null && (h.equals(SITE_HOST) || h.endsWith("." + SITE_HOST));
+        } catch (Exception e) { return false; }
+    }
+
+    /** Called from JavaScript. */
+    public class DSNative {
+        private final Context ctx;
+        DSNative(Context c) { ctx = c; }
+
+        @JavascriptInterface
+        public void saveFile(String base64, String name, String mime) {
+            try {
+                byte[] data = Base64.decode(base64, Base64.DEFAULT);
+                Uri uri = saveToDownloads(data, cleanName(name, mime), mime);
+                runOnUiThread(() -> showSaved(uri, cleanName(name, mime), mime));
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(ctx, "Download failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }
+
+        @JavascriptInterface
+        public void downloadUrl(String url, String name, String userAgent) {
+            runOnUiThread(() -> enqueueDownload(url, name, null, userAgent));
+        }
+    }
+
+    private String cleanName(String name, String mime) {
+        String n = (name == null || name.trim().isEmpty()) ? "designstager-" + System.currentTimeMillis() : name.trim();
+        n = n.replaceAll("[\\\\/:*?\"<>|]", "_");
+        if (!n.contains(".") && mime != null) {
+            String ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime);
+            if (ext != null) n = n + "." + ext;
+        }
+        return n;
+    }
+
+    private Uri saveToDownloads(byte[] data, String name, String mime) throws Exception {
+        if (mime == null || mime.isEmpty()) mime = "application/octet-stream";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentResolver cr = getContentResolver();
+            ContentValues v = new ContentValues();
+            v.put(MediaStore.Downloads.DISPLAY_NAME, name);
+            v.put(MediaStore.Downloads.MIME_TYPE, mime);
+            v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/DesignStager");
+            v.put(MediaStore.Downloads.IS_PENDING, 1);
+            Uri uri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+            if (uri == null) throw new Exception("could not create file");
+            try (OutputStream os = cr.openOutputStream(uri)) { os.write(data); }
+            v.clear();
+            v.put(MediaStore.Downloads.IS_PENDING, 0);
+            cr.update(uri, v, null, null);
+            return uri;
+        } else {
+            File dir = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "DesignStager");
+            if (!dir.exists()) dir.mkdirs();
+            File f = new File(dir, name);
+            try (FileOutputStream fos = new FileOutputStream(f)) { fos.write(data); }
+            return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", f);
+        }
+    }
+
+    private void showSaved(Uri uri, String name, String mime) {
+        new AlertDialog.Builder(this)
+                .setTitle("Download complete")
+                .setMessage(name + "\n\nSaved to Downloads/DesignStager")
+                .setPositiveButton("Open", (d, w) -> {
+                    Intent i = new Intent(Intent.ACTION_VIEW);
+                    i.setDataAndType(uri, mime);
+                    i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    try { startActivity(Intent.createChooser(i, "Open with")); }
+                    catch (ActivityNotFoundException e) { Toast.makeText(this, "No app found to open this file", Toast.LENGTH_LONG).show(); }
+                })
+                .setNeutralButton("Share", (d, w) -> {
+                    Intent s = new Intent(Intent.ACTION_SEND);
+                    s.setType(mime);
+                    s.putExtra(Intent.EXTRA_STREAM, uri);
+                    s.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(s, "Share " + name));
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void enqueueDownload(String url, String name, String mime, String userAgent) {
+        try {
+            DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url));
+            String cookies = CookieManager.getInstance().getCookie(url);
+            if (cookies != null) r.addRequestHeader("Cookie", cookies);
+            if (userAgent != null) r.addRequestHeader("User-Agent", userAgent);
+            if (mime != null) r.setMimeType(mime);
+            String fname = cleanName(name, mime);
+            r.setTitle(fname);
+            r.setDescription("DesignStager");
+            r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "DesignStager/" + fname);
+            ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(r);
+            Toast.makeText(this, "Downloading " + fname + "…", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            // fall back to the phone's browser
+            try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); } catch (Exception ignored) { }
+        }
+    }
+
+    private String readAsset(String path) {
+        try (InputStream is = getAssets().open(path); ByteArrayOutputStream bo = new ByteArrayOutputStream()) {
+            byte[] buf = new byte[8192]; int n;
+            while ((n = is.read(buf)) > 0) bo.write(buf, 0, n);
+            return bo.toString(StandardCharsets.UTF_8.name());
+        } catch (Exception e) { return ""; }
+    }
+
+    private static String jsString(String s) {
+        return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'";
+    }
+}

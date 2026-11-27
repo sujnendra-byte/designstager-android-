@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DesignStager</string>
+    <string name="title_activity_main">DesignStager</string>
+    <string name="package_name">com.designstager.app</string>
+    <string name="custom_url_scheme">com.designstager.app</string>
+</resources>
