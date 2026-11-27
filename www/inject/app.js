@@ -184,14 +184,83 @@
       while (e && e !== document.body && !on) {
         if (e.id !== 'ds-head' && e.id !== 'ds-tabs') {
           var cs = getComputedStyle(e);
-          if (cs.position === 'fixed' && e.offsetWidth >= w * 0.95 && e.offsetHeight >= h * 0.85 && cs.visibility !== 'hidden' && cs.display !== 'none') on = true;
+          if (cs.position === 'fixed' && e.offsetWidth >= w * 0.95 && e.offsetHeight >= h * 0.85 && cs.visibility !== 'hidden' && cs.display !== 'none') { on = true; overlayCheck.el = e; }
         }
         e = e.parentElement;
       }
     }
     doc.classList.toggle('ds-overlay', on);
+    // Diagnostics: a full-screen layer that is not the slide editor hides the app bars ("white screen").
+    // If it stays for 2 seconds, open the debug panel by itself (once per page).
+    var editorOpen = !!document.querySelector('#dsp-editor-fullscreen.dsp-open');
+    if (on && !editorOpen) {
+      overlayCheck.n = (overlayCheck.n || 0) + 1;
+      if (overlayCheck.n === 3 && !overlayCheck.shown) { overlayCheck.shown = 1; dsDebug(); }
+    } else overlayCheck.n = 0;
   }
 
+
+  /* ---------- AI Presentation: the 4 mode buttons appear instantly ----------
+     The site builds its own mode buttons with a script near the end of a very large page, so on a phone they
+     appear late and one by one. The app shows its own 4 buttons as soon as the page starts, hides the site's,
+     and passes each tap to the site's button (waiting for it if the page is still loading). */
+  if (/^\/ai-presentation\/?$/.test(path)) {
+    var MODES = [['deck', 'Full deck'], ['slide', 'Individual slides'], ['chart', 'AI charts'], ['anim', 'Slide animation']];
+    var mSt = document.createElement('style');
+    mSt.textContent = 'html.ds-app #dsqs .md{display:none !important}' +
+      '#ds-modes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 12px 4px;background:#f4f5f9;box-sizing:border-box}' +
+      '#ds-modes button{min-height:44px;padding:8px 4px;margin:0;border-radius:10px;border:1px solid #d5d9e4;background:#fff;' +
+      'color:#141a30;font:700 10.5px/1.25 Poppins,system-ui,sans-serif;letter-spacing:.4px;text-transform:uppercase;cursor:pointer}' +
+      '#ds-modes button.on{background:#141a30;color:#fff;border-color:#141a30}' +
+      '#ds-modes button.wait{opacity:.6}' +
+      'html.ds-overlay #ds-modes, html.ds-ed-view #ds-modes, html.ds-ed-full #ds-modes, html.ds-modes-off #ds-modes{display:none !important}';
+    (document.head || doc).appendChild(mSt);
+    var startMode = (location.hash.match(/ds-mode=(\w+)/) || [])[1] || 'deck';
+    var modeBar = document.createElement('div'); modeBar.id = 'ds-modes';
+    MODES.forEach(function (m) {
+      var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-dm', m[0]); b.textContent = m[1];
+      if (m[0] === startMode) b.className = 'on';
+      modeBar.appendChild(b);
+    });
+    var pendingMode = null, modeTimer = null;
+    function siteModeBtn(k) { return document.querySelector('#dsqs .md button[data-m="' + k + '"]'); }
+    function markMode(k) {
+      modeBar.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('on', b.getAttribute('data-dm') === k);
+        b.classList.toggle('wait', b.getAttribute('data-dm') === pendingMode);
+      });
+    }
+    function runMode(k) {
+      var sb = siteModeBtn(k);
+      if (sb) { pendingMode = null; sb.click(); markMode(k); return; }
+      pendingMode = k; markMode(k); toast('Loading…');
+      clearInterval(modeTimer);
+      modeTimer = setInterval(function () {
+        var s2 = siteModeBtn(pendingMode);
+        if (s2) { clearInterval(modeTimer); var k2 = pendingMode; pendingMode = null; s2.click(); markMode(k2); }
+      }, 150);
+    }
+    modeBar.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-dm]'); if (b) runMode(b.getAttribute('data-dm'));
+    });
+    // put the bar at the top of the page as soon as <body> exists
+    (function placeBar() {
+      if (document.body) { document.body.insertBefore(modeBar, document.body.firstChild); return; }
+      var mo = new MutationObserver(function () { if (document.body) { mo.disconnect(); placeBar(); } });
+      mo.observe(doc, { childList: true });
+    })();
+    // keep the highlighted button in step with the site, and hide the bar on screens where the site hides its own
+    setInterval(function () {
+      var md = document.querySelector('#dsqs .md');
+      if (!md) return;
+      var dsqs = document.getElementById('dsqs');
+      doc.classList.toggle('ds-modes-off', !dsqs || dsqs.offsetParent === null && getComputedStyle(dsqs).position !== 'fixed');
+      if (!pendingMode) {
+        var cur = md.querySelector('button[data-m].on, button[data-m].active, button[data-m][aria-pressed="true"]');
+        if (cur) markMode(cur.getAttribute('data-m'));
+      }
+    }, 400);
+  }
 
   /* ---------- presentation editor: simple "view" screen first, full editor on demand ---------- */
   var edCss = '' +
@@ -385,6 +454,7 @@
       'body: ' + (b ? 'disp:' + bs.display + ' vis:' + bs.visibility + ' op:' + bs.opacity + ' h:' + b.scrollHeight + ' kids:' + b.children.length : 'none'),
       'view: ' + innerWidth + 'x' + innerHeight + ' scrollY:' + Math.round(scrollY) + ' ready:' + document.readyState,
       'bars: head=' + !!document.getElementById('ds-head') + ' tabs=' + !!document.getElementById('ds-tabs'),
+      'cover: ' + (doc.classList.contains('ds-overlay') && overlayCheck.el ? dsDesc(overlayCheck.el) + ' parent: ' + dsDesc(overlayCheck.el.parentElement) : 'none'),
       'center:'
     ].concat(pts.map(function (e, i) { return ' ' + (i + 1) + ') ' + dsDesc(e); }))
       .concat(['errors:']).concat(dsErrs.length ? dsErrs.map(function (x) { return ' - ' + x; }) : [' (none)']);
