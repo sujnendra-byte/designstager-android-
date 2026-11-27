@@ -69,6 +69,8 @@
     /* Hostinger "Agent" (site-owner AI assistant) is not for app users */
     'html.ds-app [class*="kodee"], html.ds-app [id*="kodee"], html.ds-app [id*="hostinger-chatbot"],' +
     'html.ds-app [class*="hostinger-chatbot"], html.ds-app [class*="hts-chatbot"] {display:none !important}' +
+    /* never let a sidebar/assistant hide the whole page (Kodee sets body display:none on phones) */
+    'html.ds-app body{display:block !important}' +
     'html.ds-app body{padding-top:56px !important;padding-bottom:calc(68px + env(safe-area-inset-bottom,0px)) !important;background:#f4f5f9 !important}' +
     /* app header */
     '#ds-head{position:fixed;left:0;right:0;top:0;height:56px;z-index:99990;display:flex;align-items:center;gap:6px;' +
@@ -208,13 +210,9 @@
       }
     }
     doc.classList.toggle('ds-overlay', on);
-    // Diagnostics: a full-screen layer that is not the slide editor hides the app bars ("white screen").
-    // If it stays for 2 seconds, open the debug panel by itself (once per page).
-    var editorOpen = !!document.querySelector('#dsp-editor-fullscreen.dsp-open');
-    if (on && !editorOpen) {
-      overlayCheck.n = (overlayCheck.n || 0) + 1;
-      if (overlayCheck.n === 3 && !overlayCheck.shown) { overlayCheck.shown = 1; dsDebug(); }
-    } else overlayCheck.n = 0;
+    // Kodee (Hostinger site-owner assistant) must never take over the page in the app
+    doc.classList.remove('kodee-sidebar-active');
+    if (document.body) document.body.classList.remove('kodee-sidebar-active');
   }
 
 

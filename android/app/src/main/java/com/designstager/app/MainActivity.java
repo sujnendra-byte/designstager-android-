@@ -116,6 +116,19 @@ public class MainActivity extends BridgeActivity {
         }
 
         @Override
+        public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view, android.webkit.WebResourceRequest request) {
+            // Hostinger's site-owner assistant ("Kodee") is not for the app: on a phone its sidebar hides the
+            // whole website (white screen). Don't load it inside the app.
+            String u = request.getUrl().toString();
+            if (u.contains("/wp-content/plugins/hostinger-ai-assistant/")) {
+                String mime = u.contains(".css") ? "text/css" : "application/javascript";
+                return new android.webkit.WebResourceResponse(mime, "utf-8",
+                        new java.io.ByteArrayInputStream(new byte[0]));
+            }
+            return super.shouldInterceptRequest(view, request);
+        }
+
+        @Override
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
             if (isSite(url) && !injectJs.isEmpty()) view.evaluateJavascript(injectJs, null);
