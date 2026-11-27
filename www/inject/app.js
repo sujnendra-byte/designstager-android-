@@ -27,10 +27,13 @@
   }
 
   /* ---------- always use the light theme in the app ---------- */
-  try { localStorage.setItem('ds-theme', 'light'); } catch (e) { }
+  /* light theme (the debug panel's "Test A" can switch this off for testing) */
+  var noTheme = false;
+  try { noTheme = localStorage.getItem('ds-app-notheme') === '1'; } catch (e) { }
+  if (!noTheme) { try { localStorage.setItem('ds-theme', 'light'); } catch (e) { } }
   var doc = document.documentElement;
   doc.classList.add('ds-app');
-  doc.classList.remove('ds-dark', 'mode-dark');
+  if (!noTheme) doc.classList.remove('ds-dark', 'mode-dark');
 
   var TITLES = [
     [/^\/ai-presentation/, 'AI Presentation'], [/^\/ai-document/, 'AI Document'], [/^\/ai-charts/, 'AI Charts'],
@@ -447,23 +450,61 @@
   function dsDebug() {
     var old = document.getElementById('ds-debug'); if (old) { old.remove(); return; }
     var b = document.body, bs = b ? getComputedStyle(b) : null;
-    var pts = document.elementsFromPoint ? document.elementsFromPoint(innerWidth / 2, innerHeight / 2).slice(0, 6) : [];
+    var pts = document.elementsFromPoint ? document.elementsFromPoint(innerWidth / 2, innerHeight / 2).slice(0, 4) : [];
+    // big layers anywhere (also ones that ignore taps, which the centre check cannot see)
+    var big = [];
+    [].forEach.call(document.querySelectorAll('html > *, body *'), function (e) {
+      if (big.length >= 6 || e.id === 'ds-debug') return;
+      var cs = getComputedStyle(e); if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
+      if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity === 0) return;
+      var r = e.getBoundingClientRect();
+      if (r.width >= innerWidth * .9 && r.height >= innerHeight * .5 && r.bottom > 0 && r.top < innerHeight) big.push(dsDesc(e) + ' pe:' + cs.pointerEvents);
+    });
+    var pse = ['html::before', 'html::after', 'body::before', 'body::after'].map(function (k) {
+      var el = k.indexOf('html') === 0 ? doc : b, ps = el ? getComputedStyle(el, k.slice(k.indexOf('::'))) : null;
+      return ps && ps.content !== 'none' && ps.content !== 'normal' ? k + ' ' + ps.position + ' bg:' + ps.backgroundColor + ' z:' + ps.zIndex : '';
+    }).filter(Boolean);
+    var gen = document.getElementById('ds-light-gen');
     var lines = [
       'URL: ' + location.href.split('?')[0],
-      'html: ' + doc.className,
-      'body: ' + (b ? 'disp:' + bs.display + ' vis:' + bs.visibility + ' op:' + bs.opacity + ' h:' + b.scrollHeight + ' kids:' + b.children.length : 'none'),
+      'html: ' + doc.className + (noTheme ? '  [TEST A ON]' : ''),
+      'body: ' + (b ? 'disp:' + bs.display + ' vis:' + bs.visibility + ' op:' + bs.opacity + ' bg:' + bs.backgroundColor + ' h:' + b.scrollHeight : 'none'),
       'view: ' + innerWidth + 'x' + innerHeight + ' scrollY:' + Math.round(scrollY) + ' ready:' + document.readyState,
-      'bars: head=' + !!document.getElementById('ds-head') + ' tabs=' + !!document.getElementById('ds-tabs'),
-      'cover: ' + (doc.classList.contains('ds-overlay') && overlayCheck.el ? dsDesc(overlayCheck.el) + ' parent: ' + dsDesc(overlayCheck.el.parentElement) : 'none'),
-      'center:'
-    ].concat(pts.map(function (e, i) { return ' ' + (i + 1) + ') ' + dsDesc(e); }))
+      'bars: head=' + (document.getElementById('ds-head') ? dsDesc(document.getElementById('ds-head')) + ' color:' + getComputedStyle(document.querySelector('#ds-head .t') || doc).color : 'none'),
+      'tabs: ' + (document.getElementById('ds-tabs') ? dsDesc(document.getElementById('ds-tabs')) : 'none'),
+      'light css: ' + (gen ? gen.textContent.length : 0) + ' chars, white-text marks: ' + document.querySelectorAll('[data-ds-fix="w"]').length + ', dark-text marks: ' + document.querySelectorAll('[data-ds-fix="d"]').length,
+      'big layers:' + (big.length ? '' : ' none')
+    ].concat(big.map(function (x) { return ' * ' + x; }))
+      .concat(pse.length ? ['pseudo: ' + pse.join(' | ')] : [])
+      .concat(['center:']).concat(pts.map(function (e, i) { return ' ' + (i + 1) + ') ' + dsDesc(e) + ' color:' + getComputedStyle(e).color; }))
       .concat(['errors:']).concat(dsErrs.length ? dsErrs.map(function (x) { return ' - ' + x; }) : [' (none)']);
     var p = document.createElement('div'); p.id = 'ds-debug';
     p.style.cssText = 'all:initial;position:fixed;left:8px;right:8px;top:8px;z-index:2147483647;background:#fff8e6;color:#111;' +
       'border:2px solid #e7552f;border-radius:10px;padding:10px;font:11px/1.45 monospace;white-space:pre-wrap;word-break:break-all;' +
-      'max-height:80vh;overflow:auto;box-shadow:0 8px 30px rgba(0,0,0,.35)';
-    p.textContent = 'DesignStager debug (tap to close, take a screenshot)\n\n' + lines.join('\n');
-    p.onclick = function () { p.remove(); };
+      'max-height:86vh;overflow:auto;box-shadow:0 8px 30px rgba(0,0,0,.35);display:block';
+    var txt = document.createElement('div'); txt.style.cssText = 'all:initial;font:11px/1.45 monospace;white-space:pre-wrap;word-break:break-all;color:#111;display:block';
+    txt.textContent = 'DesignStager debug - screenshot this, then try the tests\n\n' + lines.join('\n');
+    p.appendChild(txt);
+    function btn(label, fn) {
+      var x = document.createElement('button'); x.textContent = label;
+      x.style.cssText = 'all:initial;display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:10px;border-radius:8px;background:#141a30;color:#fff;font:600 13px sans-serif;text-align:center';
+      x.onclick = function (ev) { ev.stopPropagation(); fn(); };
+      p.appendChild(x);
+    }
+    btn(noTheme ? 'Test A: turn light theme back ON (reload)' : 'Test A: turn light theme OFF (reload)', function () {
+      try {
+        if (noTheme) { localStorage.removeItem('ds-app-notheme'); localStorage.setItem('ds-theme', 'light'); }
+        else { localStorage.setItem('ds-app-notheme', '1'); localStorage.setItem('ds-theme', 'dark'); }
+      } catch (e) { }
+      location.reload();
+    });
+    btn('Test B: remove automatic colours (no reload)', function () {
+      [].forEach.call(document.querySelectorAll('#ds-light-gen, style[id^="ds-light"]'), function (s) { s.disabled = true; s.textContent = ''; });
+      [].forEach.call(document.querySelectorAll('[data-ds-fix]'), function (e) { e.removeAttribute('data-ds-fix'); });
+      p.remove();
+    });
+    btn('Test C: scroll to the top (no reload)', function () { scrollTo(0, 0); p.remove(); });
+    btn('Close', function () { p.remove(); });
     doc.appendChild(p);   // on <html>, so it shows even if the page body is hidden
   }
   var lpT = null, lpX = 0, lpY = 0;
