@@ -22,6 +22,12 @@ import android.webkit.WebView;
 import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
+
+import android.content.SharedPreferences;
+import java.util.Arrays;
+import java.util.HashSet;
 
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
@@ -53,7 +59,15 @@ public class MainActivity extends BridgeActivity {
         // Native helpers for the injected script
         wv.addJavascriptInterface(new DSNative(this), "DSNative");
 
-        // Inject the app UI + download hooks into designstager.com pages
+        // Inject the app UI + download hooks into designstager.com pages.
+        // Preferred: at document start (before the page draws, so the website header never flashes).
+        if (!injectJs.isEmpty() && WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            try {
+                WebViewCompat.addDocumentStartJavaScript(wv, injectJs,
+                        new HashSet<>(Arrays.asList("https://designstager.com", "https://*.designstager.com")));
+            } catch (Exception ignored) { }
+        }
+        // Fallback (and safety net): also after each page finishes loading. The script runs only once per page.
         getBridge().setWebViewClient(new DSWebViewClient(getBridge()));
 
         // Regular file downloads (links that return a file)
@@ -130,6 +144,22 @@ public class MainActivity extends BridgeActivity {
             } catch (Exception e) {
                 runOnUiThread(() -> Toast.makeText(ctx, "Download failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
             }
+        }
+
+        /** Website pages report login state + credits; the app's own screens read them back. */
+        @JavascriptInterface
+        public void setAccount(String loggedIn, String credits) {
+            SharedPreferences.Editor e = getSharedPreferences("ds", MODE_PRIVATE).edit();
+            e.putString("loggedIn", loggedIn);
+            if ("0".equals(loggedIn)) e.putString("credits", "");
+            else if (credits != null && !credits.isEmpty()) e.putString("credits", credits);
+            e.apply();
+        }
+
+        @JavascriptInterface
+        public String getAccount() {
+            SharedPreferences p = getSharedPreferences("ds", MODE_PRIVATE);
+            return "{\"loggedIn\":\"" + p.getString("loggedIn", "") + "\",\"credits\":\"" + p.getString("credits", "").replaceAll("[^0-9,]", "") + "\"}";
         }
 
         @JavascriptInterface

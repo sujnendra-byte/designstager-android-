@@ -95,3 +95,9 @@ h2 { font-size: 17px; margin: 24px 2px 12px; }
 .t4 { background: linear-gradient(135deg, #e9dcff, #b893f2); }
 .t5 { background: linear-gradient(135deg, #ffd6e6, #ee8db3); }
 .t6 { background: linear-gradient(135deg, #fff0c9, #f5cb6b); }
+
+/* header credits chip */
+.hdr-right { display: flex; align-items: center; gap: 10px; }
+.cr-chip { display: flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px; background: rgba(255,255,255,.1); color: #fff; font-size: 13px; font-weight: 500; }
+.cr-chip svg { width: 15px; height: 15px; fill: #fff; stroke: none; }
+.cr-chip.login { background: var(--orange); font-weight: 600; }
