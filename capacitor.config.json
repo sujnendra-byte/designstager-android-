@@ -10,7 +10,7 @@
   "android": {
     "appendUserAgent": "DesignStagerApp/1.0 (Android)",
     "allowMixedContent": false,
-    "webContentsDebuggingEnabled": false
+    "webContentsDebuggingEnabled": true
   },
   "plugins": {
     "SplashScreen": {
