@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -63,3 +66,24 @@ jobs:
         with:
           name: designstager-android-${{ github.run_number }}
           path: out/
+
+      - name: Publish as a GitHub release (easy download on the phone)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd out
+          for f in *.apk; do mv "$f" "DesignStager-1.0.${{ github.run_number }}-${f}"; done
+          gh release create "build-${{ github.run_number }}" * \
+            --title "DesignStager Android build ${{ github.run_number }}" \
+            --notes "Install the .apk on your phone to test. The .aab (when present) is for the Play Store." \
+            --repo "${{ github.repository }}"
+
+      - name: Keep the latest files on the 'builds' branch
+        run: |
+          git config user.name "DesignStager build"
+          git config user.email "noreply@designstager.com"
+          git checkout --orphan builds
+          git rm -rf --cached . > /dev/null
+          git add -f out/*
+          git commit -m "Build ${{ github.run_number }}"
+          git push -f origin builds
