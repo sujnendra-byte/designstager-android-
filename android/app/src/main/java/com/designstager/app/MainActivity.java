@@ -55,6 +55,11 @@ public class MainActivity extends BridgeActivity {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true);
         wv.getSettings().setSupportMultipleWindows(false);
+        // Ignore the phone's "font size" setting inside the web pages: it enlarges text in the
+        // tiny template previews and makes it overlap. Also allow very small text in thumbnails.
+        wv.getSettings().setTextZoom(100);
+        wv.getSettings().setMinimumFontSize(1);
+        wv.getSettings().setMinimumLogicalFontSize(1);
 
         // Native helpers for the injected script
         wv.addJavascriptInterface(new DSNative(this), "DSNative");
