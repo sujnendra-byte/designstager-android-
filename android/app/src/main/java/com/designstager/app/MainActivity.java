@@ -119,6 +119,37 @@ public class MainActivity extends BridgeActivity {
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
             if (isSite(url) && !injectJs.isEmpty()) view.evaluateJavascript(injectJs, null);
+            // Diagnostics: say so when the app lands on a page that is neither the website nor the app's own screens
+            if (url != null && !isSite(url) && !url.startsWith("https://localhost")) {
+                Toast.makeText(MainActivity.this, "Opened: " + url, Toast.LENGTH_LONG).show();
+            }
+        }
+
+        @Override
+        public void onReceivedError(WebView view, android.webkit.WebResourceRequest request, android.webkit.WebResourceError error) {
+            super.onReceivedError(view, request, error);
+            if (request.isForMainFrame()) {
+                Toast.makeText(MainActivity.this, "Page failed to load (" + error.getErrorCode() + "): "
+                        + error.getDescription(), Toast.LENGTH_LONG).show();
+            }
+        }
+
+        @Override
+        public void onReceivedHttpError(WebView view, android.webkit.WebResourceRequest request, android.webkit.WebResourceResponse resp) {
+            super.onReceivedHttpError(view, request, resp);
+            if (request.isForMainFrame()) {
+                Toast.makeText(MainActivity.this, "Server error " + resp.getStatusCode() + " on " + request.getUrl().getPath(),
+                        Toast.LENGTH_LONG).show();
+            }
+        }
+
+        @Override
+        public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+            // The page crashed (often: out of memory). Restart the screen instead of leaving it blank / closing the app.
+            Toast.makeText(MainActivity.this, detail.didCrash() ? "The page crashed, reopening…"
+                    : "The page ran out of memory, reopening…", Toast.LENGTH_LONG).show();
+            recreate();
+            return true;
         }
 
         @Override

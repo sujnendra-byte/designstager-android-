@@ -6,6 +6,16 @@
 (function () {
   if (window.__dsApp) return;
   window.__dsApp = true;
+  /* remember the last script errors for the debug panel (long-press anywhere) */
+  var dsErrs = [];
+  window.addEventListener('error', function (e) {
+    dsErrs.push((e.message || 'error') + ' @ ' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || ''));
+    if (dsErrs.length > 6) dsErrs.shift();
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    dsErrs.push('promise: ' + String(e.reason && (e.reason.message || e.reason)).slice(0, 160));
+    if (dsErrs.length > 6) dsErrs.shift();
+  });
   var HOME = 'https://localhost/index.html';
   var CREATE = 'https://localhost/create.html';
   var path = location.pathname;
@@ -355,6 +365,49 @@
       }
     }, 250);
   }
+
+  /* ---------- debug panel: long-press (about 1 second) anywhere to see what is on screen ---------- */
+  function dsDesc(e) {
+    if (!e || !e.tagName) return String(e);
+    var cs = getComputedStyle(e), r = e.getBoundingClientRect();
+    return e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') +
+      (typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/).slice(0, 3).join('.') : '') +
+      ' [' + cs.position + ' ' + Math.round(r.width) + 'x' + Math.round(r.height) + ' disp:' + cs.display +
+      ' vis:' + cs.visibility + ' op:' + cs.opacity + ' bg:' + cs.backgroundColor + ' z:' + cs.zIndex + ']';
+  }
+  function dsDebug() {
+    var old = document.getElementById('ds-debug'); if (old) { old.remove(); return; }
+    var b = document.body, bs = b ? getComputedStyle(b) : null;
+    var pts = document.elementsFromPoint ? document.elementsFromPoint(innerWidth / 2, innerHeight / 2).slice(0, 6) : [];
+    var lines = [
+      'URL: ' + location.href.split('?')[0],
+      'html: ' + doc.className,
+      'body: ' + (b ? 'disp:' + bs.display + ' vis:' + bs.visibility + ' op:' + bs.opacity + ' h:' + b.scrollHeight + ' kids:' + b.children.length : 'none'),
+      'view: ' + innerWidth + 'x' + innerHeight + ' scrollY:' + Math.round(scrollY) + ' ready:' + document.readyState,
+      'bars: head=' + !!document.getElementById('ds-head') + ' tabs=' + !!document.getElementById('ds-tabs'),
+      'center:'
+    ].concat(pts.map(function (e, i) { return ' ' + (i + 1) + ') ' + dsDesc(e); }))
+      .concat(['errors:']).concat(dsErrs.length ? dsErrs.map(function (x) { return ' - ' + x; }) : [' (none)']);
+    var p = document.createElement('div'); p.id = 'ds-debug';
+    p.style.cssText = 'all:initial;position:fixed;left:8px;right:8px;top:8px;z-index:2147483647;background:#fff8e6;color:#111;' +
+      'border:2px solid #e7552f;border-radius:10px;padding:10px;font:11px/1.45 monospace;white-space:pre-wrap;word-break:break-all;' +
+      'max-height:80vh;overflow:auto;box-shadow:0 8px 30px rgba(0,0,0,.35)';
+    p.textContent = 'DesignStager debug (tap to close, take a screenshot)\n\n' + lines.join('\n');
+    p.onclick = function () { p.remove(); };
+    doc.appendChild(p);   // on <html>, so it shows even if the page body is hidden
+  }
+  var lpT = null, lpX = 0, lpY = 0;
+  document.addEventListener('touchstart', function (e) {
+    var t = e.touches && e.touches[0]; if (!t || e.touches.length > 1) return;
+    lpX = t.clientX; lpY = t.clientY; clearTimeout(lpT);
+    lpT = setTimeout(dsDebug, 1100);
+  }, { capture: true, passive: true });
+  document.addEventListener('touchmove', function (e) {
+    var t = e.touches && e.touches[0];
+    if (t && (Math.abs(t.clientX - lpX) > 12 || Math.abs(t.clientY - lpY) > 12)) clearTimeout(lpT);
+  }, { capture: true, passive: true });
+  document.addEventListener('touchend', function () { clearTimeout(lpT); }, { capture: true, passive: true });
+  window.__dsDebug = dsDebug;
 
   /* ---------- downloads ---------- */
   if (!window.DSNative) return;
