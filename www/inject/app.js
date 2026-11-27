@@ -18,12 +18,27 @@
     'font-weight:500;color:#6b7190;text-decoration:none;padding:4px 0;line-height:1.2}' +
     '#ds-tabs a.on{color:#e7552f}' +
     '#ds-tabs svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}' +
+    /* marketplace: compact category panel that hides while scrolling */
+    '@media (max-width:900px){' +
+    'html.ds-app .ds-mkt-sb{padding:10px 12px 8px !important;max-height:240px;overflow:hidden !important;' +
+    'transition:max-height .28s ease,padding .28s ease,opacity .2s ease}' +
+    'html.ds-app .ds-mkt-sb h3{display:none !important}' +
+    'html.ds-app .ds-mkt-type-toggle{gap:8px !important;margin:0 0 8px !important}' +
+    'html.ds-app .ds-mkt-type-btn{padding:8px 10px !important;font-size:14px !important;text-align:center;border-radius:10px !important}' +
+    'html.ds-app .ds-mkt-mains{display:flex !important;flex-direction:row !important;align-items:center !important;flex-wrap:nowrap !important;overflow-x:auto !important;gap:8px !important;' +
+    'padding-bottom:2px;scrollbar-width:none}' +
+    'html.ds-app .ds-mkt-mains::-webkit-scrollbar{display:none}' +
+    'html.ds-app .ds-mkt-main-btn{flex:0 0 auto !important;width:auto !important;max-width:none !important;min-width:0 !important;white-space:nowrap !important;margin:0 !important;' +
+    'padding:7px 14px !important;font-size:12.5px !important;border-radius:999px !important;letter-spacing:.3px}' +
+    'html.ds-app.ds-sb-hide .ds-mkt-sb{max-height:0 !important;padding-top:0 !important;padding-bottom:0 !important;' +
+    'opacity:0;border-bottom-width:0 !important}' +
+    '}' +
     '#ds-toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);' +
     'z-index:2147483001;background:#141a30;color:#fff;font:500 13px Poppins,system-ui,sans-serif;' +
     'padding:10px 16px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);display:none;max-width:86vw;text-align:center}';
   var tabs = [
     ['Home', HOME, '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>', /^$/],
-    ['Create', 'https://designstager.com/ai-presentation/', '<path d="M12 3l2.2 5.3L20 9l-4.5 3.8L17 19l-5-3-5 3 1.5-6.2L4 9l5.8-.7z"/>', /^\/(ai-|ai-studio)/],
+    ['Create', 'https://localhost/create.html', '<path d="M12 3l2.2 5.3L20 9l-4.5 3.8L17 19l-5-3-5 3 1.5-6.2L4 9l5.8-.7z"/>', /^\/(ai-|ai-studio)/],
     ['Market', 'https://designstager.com/marketplace/', '<path d="M4 7h16l-1.5 12a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2z"/><path d="M9 7a3 3 0 0 1 6 0"/>', /^\/marketplace/],
     ['Creations', 'https://designstager.com/my-creations/', '<path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', /^\/my-creations/],
     ['Account', 'https://designstager.com/my-account/', '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>', /^\/(my-account|login)/]
@@ -50,6 +65,33 @@
   }
   window.__dsToast = toast;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addUI); else addUI();
+
+  /* ---------- marketplace: hide the category panel when scrolling down, show it when scrolling up ---------- */
+  var lastY = new WeakMap();
+  document.addEventListener('scroll', function (e) {
+    if (!document.querySelector('.ds-mkt-sb')) return;
+    // only the marketplace's own results list (when the whole page scrolls, the panel scrolls away by itself)
+    var el = e.target;
+    if (!el || !el.closest || !el.closest('.ds-mkt-main')) return;
+    var y = el.scrollTop || 0, prev = lastY.has(el) ? lastY.get(el) : y, d = y - prev;
+    lastY.set(el, y);
+    if (y < 30) doc.classList.remove('ds-sb-hide');
+    else if (d > 6) doc.classList.add('ds-sb-hide');
+    else if (d < -10) doc.classList.remove('ds-sb-hide');
+  }, true);
+
+  /* ---------- deep links from the app's Create screen (#ds-mode=slide|anim|chart|deck) ---------- */
+  var mode = (location.hash.match(/ds-mode=(\w+)/) || [])[1];
+  if (mode) {
+    var tries = 0;
+    var t = setInterval(function () {
+      var b = document.querySelector('button[data-m="' + mode + '"]');
+      if (b || ++tries > 40) {
+        clearInterval(t);
+        if (b) { b.click(); history.replaceState(null, '', location.pathname + location.search); }
+      }
+    }, 250);
+  }
 
   /* ---------- downloads ---------- */
   if (!window.DSNative) return;
