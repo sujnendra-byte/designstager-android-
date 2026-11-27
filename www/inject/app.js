@@ -6,6 +6,21 @@
 (function () {
   if (window.__dsApp) return;
   window.__dsApp = true;
+  /* Test D (debug panel): open the website with the app layer switched off, to see if the white screen remains */
+  var appOff = false;
+  try { appOff = localStorage.getItem('ds-app-off') === '1'; } catch (e) { }
+  if (appOff) {
+    var addOn = function () {
+      if (document.getElementById('ds-app-on')) return;
+      var x = document.createElement('button'); x.id = 'ds-app-on'; x.textContent = 'TEST D is ON - tap to turn app layer back on';
+      x.style.cssText = 'all:initial;position:fixed;left:8px;right:8px;bottom:12px;z-index:2147483647;padding:12px;border-radius:10px;' +
+        'background:#e7552f;color:#fff;font:600 13px sans-serif;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.3)';
+      x.onclick = function () { try { localStorage.removeItem('ds-app-off'); } catch (e) { } location.reload(); };
+      document.documentElement.appendChild(x);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addOn); else addOn();
+    return;
+  }
   /* remember the last script errors for the debug panel (long-press anywhere) */
   var dsErrs = [];
   window.addEventListener('error', function (e) {
@@ -504,6 +519,10 @@
       p.remove();
     });
     btn('Test C: scroll to the top (no reload)', function () { scrollTo(0, 0); p.remove(); });
+    btn('Test D: switch the whole app layer OFF (reload)', function () {
+      try { localStorage.setItem('ds-app-off', '1'); } catch (e) { }
+      location.reload();
+    });
     btn('Close', function () { p.remove(); });
     doc.appendChild(p);   // on <html>, so it shows even if the page body is hidden
   }
