@@ -278,9 +278,108 @@
     }, 400);
   }
 
-  /* ---------- presentation editor: the site's own editor layout (no app changes) ---------- */
-  // earlier test builds turned the phone to landscape for the editor; always go back to normal
-  try { if (window.DSNative && DSNative.setOrientation) DSNative.setOrientation('auto'); } catch (e) { }
+  /* ---------- presentation editor ----------
+     View page (opens first): slides on top, the selected slide in the centre, Themes / Pick a Design under it,
+     Change Layout below, and Download / Animate / Preview / Edit design at the bottom. Nothing else.
+     "Edit design" opens the site's full editor (landscape) with a Done button to come back. */
+  var vwCss = '' +
+    'html.ds-ed-view #dsp-ppt-toolbar, html.ds-ed-view #dsel-dock, html.ds-ed-view #dsel-keys, html.ds-ed-view #dsel-panel,' +
+    'html.ds-ed-view #dsp-ppt-panel-left-header, html.ds-ed-view #dsds-tile, html.ds-ed-view #dsp-ppt-panel-left-footer,' +
+    'html.ds-ed-view #dsp-bottom-pill, html.ds-ed-view .vp-thumb-del, html.ds-ed-view .dsx-tact, html.ds-ed-view #ds-suji-btn,' +
+    'html.ds-ed-view #ds-eap-btn, html.ds-ed-view #dsel-ov, html.ds-ed-view #vp-collapse-toggle{display:none !important}' +
+    'html.ds-ed-view #dsp-editor-fullscreen{padding-top:56px !important;padding-bottom:var(--ds-act-h,88px) !important;' +
+    'box-sizing:border-box !important;background:#f4f5f9 !important}' +
+    'html.ds-ed-view #dsp-ppt-workspace{height:100% !important}' +
+    'html.ds-ed-view #dsp-ppt-panel-right{flex:1 1 auto !important;min-height:0 !important;display:flex !important;flex-direction:column !important}' +
+    'html.ds-ed-view #dsp-ppt-canvas-area{flex:1 1 auto !important;min-height:0 !important;height:auto !important}' +
+    'html.ds-ed-view #dsp-ppt-bottom-bar{flex:none !important;height:auto !important;padding:6px 10px !important}' +
+    'html.ds-ed-view #dsp-vp-panel{bottom:var(--ds-act-h,88px) !important}' +
+    /* app bars */
+    '#ds-ed-top,#ds-ed-act,#ds-ed-done{font-family:Poppins,system-ui,sans-serif;box-sizing:border-box}' +
+    '#ds-ed-top{position:fixed;left:0;right:0;top:0;height:56px;z-index:100002;display:none;align-items:center;gap:6px;' +
+    'background:#fff !important;border-bottom:1px solid #e4e6ef;padding:0 10px 0 6px}' +
+    '#ds-ed-top .b{width:40px;height:40px;display:grid;place-items:center;border:0;background:none !important;padding:0;color:#141a30 !important}' +
+    '#ds-ed-top .t{flex:1;font-size:16px;font-weight:600;color:#141a30 !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '#ds-ed-top .s{border:1px solid #d5d9e4 !important;background:#fff !important;color:#141a30 !important;border-radius:999px;' +
+    'padding:6px 14px;font:500 13px Poppins,sans-serif;letter-spacing:.8px}' +
+    '#ds-ed-act{position:fixed;left:0;right:0;bottom:0;z-index:100002;display:none;gap:8px;background:#fff !important;' +
+    'border-top:1px solid #e4e6ef;padding:10px 12px calc(env(safe-area-inset-bottom,0px) + 10px);box-shadow:0 -4px 16px rgba(20,26,48,.08)}' +
+    '#ds-ed-act button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;border:0;border-radius:12px;padding:8px 2px;' +
+    'background:#f1f2f7 !important;color:#141a30 !important;font:600 11px Poppins,system-ui,sans-serif;letter-spacing:.6px;text-transform:uppercase}' +
+    '#ds-ed-act button.p{background:#e7552f !important;color:#fff !important}' +
+    '#ds-ed-act svg,#ds-ed-top svg,#ds-ed-done svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}' +
+    'html.ds-ed-view #ds-ed-top, html.ds-ed-view #ds-ed-act{display:flex}' +
+    'html.ds-ed-view #dsx-menu{position:fixed !important;left:12px !important;right:12px !important;top:auto !important;' +
+    'bottom:calc(var(--ds-act-h,88px) + 8px) !important;width:auto !important;max-width:none !important;z-index:100003 !important}' +
+    /* full editor: the site's own editor + a Done button */
+    'html.ds-ed-full #dsp-ppt-toolbar, html.ds-ed-full #dsel-dock .dsel-right{overflow-x:auto !important;flex-wrap:nowrap !important;scrollbar-width:none}' +
+    'html.ds-ed-full #dsp-ppt-toolbar > *, html.ds-ed-full #dsel-dock .dsel-right > *{flex:0 0 auto !important}' +
+    '#ds-ed-done{position:fixed;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 64px);z-index:100002;display:none;align-items:center;gap:6px;' +
+    'border:0;border-radius:999px;padding:10px 16px;background:#141a30 !important;color:#fff !important;font:600 13px Poppins,sans-serif;' +
+    'box-shadow:0 6px 18px rgba(0,0,0,.3)}' +
+    'html.ds-ed-full #ds-ed-done{display:flex}';
+  var vwSt = document.createElement('style'); vwSt.textContent = vwCss; (document.head || doc).appendChild(vwSt);
+
+  var IC = {
+    back: '<path d="M15 5l-7 7 7 7"/>',
+    dl: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+    anim: '<path d="M5 4l14 8-14 8z"/><path d="M2 8v8" opacity=".5"/>',
+    prev: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M10 9l5 2-5 2zM8 21h8"/>',
+    edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
+    done: '<path d="M5 12l5 5 9-10"/>'
+  };
+  var fullEdit = false, edOn = false;
+  function siteClick(sel) { var b = document.querySelector(sel); if (b) b.click(); return !!b; }
+  function setOrient(o) { try { if (window.DSNative && DSNative.setOrientation) DSNative.setOrientation(o); } catch (e) { } }
+  function refit() { setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 120); setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 600); }
+  function buildEdBars() {
+    if (document.getElementById('ds-ed-top')) return;
+    var top = document.createElement('div'); top.id = 'ds-ed-top';
+    top.innerHTML = '<button class="b" aria-label="Back"><svg viewBox="0 0 24 24">' + IC.back + '</svg></button><div class="t"></div><button class="s">SAVE</button>';
+    top.querySelector('.b').onclick = function () { siteClick('.dsp-tb-back'); };
+    top.querySelector('.s').onclick = function () { siteClick('#dsp-savebtn'); toast('Saved'); };
+    var act = document.createElement('div'); act.id = 'ds-ed-act';
+    act.innerHTML =
+      '<button data-a="dl"><svg viewBox="0 0 24 24">' + IC.dl + '</svg>Download</button>' +
+      '<button data-a="anim"><svg viewBox="0 0 24 24">' + IC.anim + '</svg>Animate</button>' +
+      '<button data-a="prev"><svg viewBox="0 0 24 24">' + IC.prev + '</svg>Preview</button>' +
+      '<button data-a="edit" class="p"><svg viewBox="0 0 24 24">' + IC.edit + '</svg>Edit design</button>';
+    act.onclick = function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      var a = b.getAttribute('data-a');
+      if (a === 'dl') siteClick('#dsp-buildbtn');
+      else if (a === 'anim') siteClick('#dsan-tb');
+      else if (a === 'prev') siteClick('#dssp-tb');
+      else if (a === 'edit') enterFull();
+    };
+    var done = document.createElement('button'); done.id = 'ds-ed-done';
+    done.innerHTML = '<svg viewBox="0 0 24 24">' + IC.done + '</svg>Done';
+    done.onclick = function () { siteClick('#dsp-savebtn'); exitFull(); };
+    document.body.appendChild(top); document.body.appendChild(act); document.body.appendChild(done);
+  }
+  function actHeight() {
+    var a = document.getElementById('ds-ed-act');
+    if (a && a.offsetHeight) doc.style.setProperty('--ds-act-h', a.offsetHeight + 'px');
+  }
+  function enterView() { doc.classList.remove('ds-ed-full'); doc.classList.add('ds-ed-view'); setOrient('auto'); setTimeout(actHeight, 50); refit(); }
+  function enterFull() { fullEdit = true; doc.classList.remove('ds-ed-view'); doc.classList.add('ds-ed-full'); setOrient('landscape'); refit(); }
+  function exitFull() { fullEdit = false; enterView(); }
+  function editorCheck() {
+    var ed = document.querySelector('#dsp-editor-fullscreen.dsp-open');
+    if (ed && !edOn) {
+      edOn = true; buildEdBars();
+      var t = document.getElementById('dsp-etitle');
+      document.querySelector('#ds-ed-top .t').textContent = t ? t.textContent.trim() : 'Presentation';
+      if (!fullEdit) enterView();
+    } else if (!ed && edOn) {
+      edOn = false; fullEdit = false; doc.classList.remove('ds-ed-view', 'ds-ed-full'); setOrient('auto');
+    } else if (ed && !fullEdit) {
+      var t2 = document.getElementById('dsp-etitle');
+      if (t2) document.querySelector('#ds-ed-top .t').textContent = t2.textContent.trim();
+    }
+  }
+  setOrient('auto');
+  setInterval(editorCheck, 700);
 
   /* ---------- Slide Animation: only the slide preview stays on top, and only once you scroll ----------
      The preview keeps its normal place; when you scroll down through the styles it sticks to the top
