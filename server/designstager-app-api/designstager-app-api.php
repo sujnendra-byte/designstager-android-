@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DesignStager App API
  * Description: Secure login and clean JSON endpoints for the DesignStager iOS / Android app. Works next to the main DesignStager plugin.
- * Version:     1.0.0
+ * Version:     1.1.0
  * Author:      DesignStager
  * Requires PHP: 7.4
  *
@@ -16,6 +16,8 @@
  *   POST market/download  same daily limits as the website, then the file link
  *   POST web-code         one-time code so a web page opened inside the app is already logged in
  *   GET  web              uses that code: logs the in-app browser in and opens the page
+ *   POST exchange         app sign-in through the website (Google, Microsoft or email) -> app token
+ *   GET  login-options    which login buttons the app should show
  *
  * The token also works on the site's existing routes (/wp-json/ds/v1/...), e.g. credits, my-ppts,
  * my-audio, my-videos, load-ppt — the app sends it in the "X-DS-App-Token" header
@@ -411,3 +413,6 @@ function dsapp_dlm_file_url( $id ) {
 /* Let the app call the API from its own screens (React Native sends no browser Origin, so nothing extra is needed);
    the token header must be allowed for the in-app web pages that call the API. */
 add_filter( 'rest_allowed_cors_headers', function ( $h ) { $h[] = 'X-DS-App-Token'; return $h; } );
+
+/* Google & Microsoft login + app sign-in through the website */
+require_once __DIR__ . '/social-login.php';

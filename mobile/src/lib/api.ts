@@ -61,7 +61,7 @@ export async function api<T = any>(path: string, opts: Opts = {}): Promise<T> {
   } catch {
     /* not JSON */
   }
-  if (res.status === 401 && token && path !== 'ds-app/v1/login') {
+  if (res.status === 401 && token && !/ds-app\/v1\/(login|exchange)/.test(path)) {
     await saveToken(null);
     onSignedOut?.();
   }
@@ -89,6 +89,13 @@ export const login = (username: string, password: string) =>
   api<{ token: string; user: User }>('ds-app/v1/login', {
     body: { username, password, device: `${Platform.OS} app` },
   });
+/** Swap the one-time code from the website login for this phone's token. */
+export const exchangeCode = (code: string, verifier: string) =>
+  api<{ token: string; user: User }>('ds-app/v1/exchange', {
+    body: { code, verifier, device: `${Platform.OS} app` },
+  });
+export const getLoginOptions = () =>
+  api<{ google: boolean; microsoft: boolean; email: boolean }>('ds-app/v1/login-options');
 export const logout = () => api('ds-app/v1/logout', { body: {} }).catch(() => null);
 export const getMe = () => api<Me>('ds-app/v1/me');
 

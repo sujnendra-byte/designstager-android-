@@ -1,13 +1,14 @@
 // Who is logged in. The token lives in the phone's secure storage.
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { getMe, loadToken, login as apiLogin, logout as apiLogout, Me, saveToken, setSignedOutHandler } from './api';
+import { exchangeCode, getMe, loadToken, logout as apiLogout, Me, saveToken, setSignedOutHandler } from './api';
+import { Provider, websiteLogin } from './webLogin';
 
 type AuthState = {
   ready: boolean;
   signedIn: boolean;
   me: Me | null;
   refresh: () => Promise<void>;
-  signIn: (u: string, p: string) => Promise<void>;
+  signIn: (provider: Provider) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -42,8 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const signIn = useCallback(
-    async (u: string, p: string) => {
-      const r = await apiLogin(u, p);
+    async (provider: Provider) => {
+      const { code, verifier } = await websiteLogin(provider);
+      const r = await exchangeCode(code, verifier);
       await saveToken(r.token);
       setSignedIn(true);
       await refresh();
