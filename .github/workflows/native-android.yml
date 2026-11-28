@@ -1,0 +1,90 @@
+name: Build native app (Android)
+
+# Builds the new React Native app in mobile/ and the "DesignStager App API" WordPress plugin.
+on:
+  push:
+    branches: [native-app]
+    paths: ['mobile/**', 'server/**', '.github/workflows/native-android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install and generate the Android project
+        working-directory: mobile
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 2.0.${{ github.run_number }}
+          EXPO_NO_TELEMETRY: 1
+        run: |
+          npm ci
+          npx tsc --noEmit
+          npx expo prebuild --platform android --no-install
+
+      - name: Signing key (real key if the secret is set, otherwise a test key)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          else
+            keytool -genkeypair -keystore "$RUNNER_TEMP/release.jks" -alias designstager -keyalg RSA -keysize 2048 \
+              -validity 3650 -storepass dstest123 -keypass dstest123 -dname "CN=DesignStager Test, O=DesignStager, C=IN"
+          fi
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build
+        working-directory: mobile/android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 2.0.${{ github.run_number }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'dstest123' }}
+          KEY_ALIAS: designstager
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'dstest123' }}
+          NODE_ENV: production
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease bundleRelease
+
+      - name: Collect files
+        run: |
+          mkdir -p out
+          find mobile/android/app/build/outputs -name "*.apk" -exec cp {} out/ \;
+          find mobile/android/app/build/outputs -name "*.aab" -exec cp {} out/ \;
+          for f in out/*.apk; do mv "$f" "out/DesignStager-2.0.${{ github.run_number }}-$(basename "$f")"; done
+          (cd server && zip -qr ../out/designstager-app-api.zip designstager-app-api)
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: designstager-native-${{ github.run_number }}
+          path: out/
+
+      - name: Publish as a GitHub release (easy download on the phone)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "native-${{ github.run_number }}" out/* \
+            --target "${{ github.sha }}" \
+            --title "DesignStager native app — build ${{ github.run_number }}" \
+            --notes "New native app (React Native). Install the .apk on your phone. designstager-app-api.zip is the WordPress plugin the app needs (install it on the site first)." \
+            --prerelease \
+            --repo "${{ github.repository }}"
